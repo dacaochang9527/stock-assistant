@@ -1,0 +1,39 @@
+market:
+  universe: "a_share"
+  exclude_st: true
+  exclude_beijing_exchange: true
+  min_avg_turnover_20d: 100000000
+  min_price: 3
+
+tulong:
+  enabled: true
+  d1:
+    require_first_limit_up: true
+    exclude_one_word_board: true
+    min_turnover_amount: 100000000
+  d2:
+    max_volume_ratio_to_d1: 2.0
+    max_open_gap: 0.04
+    min_high_above_open: 0.02
+    min_close_below_high: 0.02
+    reject_high_open_selloff: true
+  d3:
+    require_underwater: true
+    preferred_time_start: "09:50"
+    preferred_time_end: "10:30"
+    max_intraday_loss: 0.07
+  exit:
+    d4_high_open_take_profit: 0.04
+    force_exit_day: 5
+
+swing:
+  enabled: true
+  trend:
+    require_close_above_ma20: true
+    require_ma5_above_ma10: true
+    max_distance_from_ma20: 0.15
+  volume:
+    min_volume_ratio_to_ma5: 1.2
+    max_volume_ratio_to_ma5: 3.0
+  breakout:
+    lookback_days: 20

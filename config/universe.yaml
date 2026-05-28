@@ -1,0 +1,12 @@
+universe:
+  include:
+    - "中证1000"
+    - "中证500"
+    - "沪深300"
+  fallback: "近20日日均成交额Top1500"
+  exclude:
+    st: true
+    beijing_exchange: true
+    newly_listed_days_lt: 60
+    avg_turnover_20d_lt: 100000000
+    price_lt: 3

@@ -1,0 +1,10 @@
+.venv/
+.venv-py39-bad-*/
+.env
+__pycache__/
+.pytest_cache/
+*.pyc
+data/raw/
+data/processed/
+reports/daily/*.md
+.DS_Store

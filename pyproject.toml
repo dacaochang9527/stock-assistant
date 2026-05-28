@@ -1,0 +1,23 @@
+[project]
+name = "a-share-stock-assistant"
+version = "0.1.0"
+description = "个人 A 股中短线波段与屠龙战术选股助手"
+requires-python = ">=3.10"
+dependencies = [
+  "pyyaml>=6.0",
+  "pandas>=2.0",
+]
+
+[project.optional-dependencies]
+data = [
+  "akshare>=1.14.0",
+  "tushare>=1.4.0",
+  "python-dotenv>=1.0.0",
+]
+test = [
+  "pytest>=8.0",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

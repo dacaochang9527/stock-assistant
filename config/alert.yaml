@@ -1,0 +1,24 @@
+delivery:
+  channel: "weixin"
+  daily_report_time: "15:30"
+
+intraday_monitor:
+  enabled: false
+  polling:
+    morning_open:
+      start: "09:30"
+      end: "10:30"
+      interval_seconds: 180
+    morning_mid:
+      start: "10:30"
+      end: "11:30"
+      interval_seconds: 300
+    afternoon:
+      start: "13:00"
+      end: "14:30"
+      interval_seconds: 300
+    close_period:
+      start: "14:30"
+      end: "15:00"
+      interval_seconds: 180
+  dedupe_minutes: 30
