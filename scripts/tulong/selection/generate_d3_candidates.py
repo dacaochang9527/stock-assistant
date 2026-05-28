@@ -19,6 +19,7 @@ from stock_assistant.strategy_tulong import (  # noqa: E402
     evaluate_d1_board,
     hhmm_to_int,
     is_d2_pullback,
+    is_d2_balanced_cross,
     safe_float,
 )
 
@@ -171,15 +172,19 @@ def score_candidate(row, d1, d2, support) -> tuple[float, str, str]:
 
     if 0.55 <= vol_ratio <= 1.25:
         score += 12; notes.append(f"D2量比温和{vol_ratio:.2f}")
-    elif 1.25 < vol_ratio <= 1.6:
+    elif 1.25 < vol_ratio <= 2:
         score += 5; notes.append(f"D2量比略高{vol_ratio:.2f}")
+    elif 2 < vol_ratio <= 3:
+        score -= 4; notes.append(f"D2量比{vol_ratio:.2f}在2-3倍，需其他条件补强"); flags.append("量能偏大")
     elif vol_ratio < 0.55:
-        score -= 3; notes.append(f"D2量比偏低{vol_ratio:.2f}")
+        score -= 10; notes.append(f"D2缩量过弱{vol_ratio:.2f}"); flags.append("缩量过弱")
     else:
-        score -= 10; notes.append(f"D2量比偏大{vol_ratio:.2f}"); flags.append("量能偏大")
+        score -= 20; notes.append(f"D2量比超过3倍{vol_ratio:.2f}"); flags.append("量能过大")
 
-    if close_below_high >= 0.05:
-        score += 8; notes.append("D2回落充分")
+    if close_below_high > 0.08:
+        score -= 12; notes.append("D2上引线太长"); flags.append("上引线过长")
+    elif close_below_high >= 0.05:
+        score += 3; notes.append("D2回落充分")
     elif close_below_high >= 0.03:
         score += 5; notes.append("D2有冲高回落")
     elif close_below_high >= 0.02:
@@ -196,6 +201,8 @@ def score_candidate(row, d1, d2, support) -> tuple[float, str, str]:
 
     if high_above_open >= 0.04:
         score += 4; notes.append("D2盘中上冲明显")
+    if is_d2_balanced_cross(d2):
+        score += 6; notes.append("D2收盘近十字")
     if open_gap > 0.04 and d2.close < d2.open:
         score -= 10; notes.append("D2高开低走风险"); flags.append("高开低走")
 
@@ -353,7 +360,7 @@ def generate(args: SelectionArgs) -> OutputPaths:
         lines.append(f"- 观察价 {c.trigger_price:.2f}｜买点区 {c.zone_low:.2f}–{c.zone_high:.2f}｜失效 {c.invalid_price:.2f}")
         lines.append(f"- D2 收 {c.d2_close:.2f}，高 {c.d2_high:.2f}，低 {c.d2_low:.2f}，涨跌 {c.d2_pct:.2f}%，成交额 {fmt_yi(c.d2_amount)}，换手 {c.d2_turnover:.2f}%")
         lines.append(f"- 结构：D2/D1量比 {c.d2_volume_ratio:.2f}｜高点回落 {c.d2_pullback*100:.1f}%｜安全垫 {c.above_support*100:.1f}%")
-        lines.append(f"- D1质量：首次封板 {c.d1_first_seal}｜炸板 {c.d1_open_breaks}｜封板资金 {fmt_yi(c.d1_fund)}")
+        lines.append(f"- D1封板结构：首次封板 {c.d1_first_seal}｜炸板 {c.d1_open_breaks}｜封板资金 {fmt_yi(c.d1_fund)}")
         lines.append(f"- note：{c.note}")
         if c.flags:
             lines.append(f"- 风险标记：{c.flags}")

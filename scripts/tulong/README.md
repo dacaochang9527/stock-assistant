@@ -31,7 +31,8 @@ scripts/tulong         = 流程编排器 / 实际运行脚本
 
 - `runtime/preopen_rotate_watchlist.py`
   - 开盘前切池脚本。
-  - 08:50 cron 调用，合并今日 D3/D4 watch/position 源文件到 active 池。
+  - 08:50 cron 调用，合并今日 D3 watch/position 与 D4 position 源文件到 active 池。
+  - D4 不再接收 watch 源文件；若混入 D4/watch 行会被拒绝。
 
 - `runtime/preopen_guard_check.py`
   - 开盘前守门校验脚本。

@@ -100,6 +100,8 @@ def validate(now: datetime) -> tuple[list[str], dict[str, Any]]:
             errors.append(f'{code} stage日期异常：当前={stage}，期望前缀={expected_prefix}')
         if pool_type not in VALID_POOL_TYPES:
             errors.append(f'{code} pool_type异常：当前={pool_type}，期望=watch/position')
+        if stage.endswith('D4') and pool_type != 'position':
+            errors.append(f'{code} D4只允许持有区position，当前pool_type={pool_type}')
 
     if bad_prefix:
         errors.append('实际监控池混入非沪深主板/20cm标的：' + '、'.join(bad_prefix))
@@ -133,7 +135,7 @@ def validate(now: datetime) -> tuple[list[str], dict[str, Any]]:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description='Guard-check active Tulong D3/D4 watchlist after preopen rotation.')
+    parser = argparse.ArgumentParser(description='Guard-check active Tulong D3 watchlist and D4 positions after preopen rotation.')
     parser.add_argument('--date', help='Override watch date, format YYYY-MM-DD. Useful for dry-run verification.')
     return parser.parse_args()
 

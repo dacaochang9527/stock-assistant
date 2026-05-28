@@ -8,6 +8,7 @@ from stock_assistant.strategy_tulong import (
     estimate_d1_support,
     evaluate_d1_board,
     is_d1_first_board,
+    is_d2_balanced_cross,
     is_d2_pullback,
     is_excluded_name,
     is_first_board_from_zt_row,
@@ -51,12 +52,36 @@ def test_d1_first_board_requires_today_limit_and_yesterday_not_limit():
     assert is_d1_first_board(today, yesterday)
 
 
-def test_d2_pullback_rejects_volume_more_than_twice_d1():
+def test_d2_pullback_accepts_volume_between_two_and_three_when_other_conditions_pass():
     d1 = bar(1, 10, 11, 10, 10.98, 9.9, volume=100, limit_up=11)
     d2 = bar(2, 10.8, 11.3, 10.5, 10.9, 10.98, volume=250, limit_up=12.08)
     ok, reason = is_d2_pullback(d1, d2, estimate_d1_support(d1))
+    assert ok, reason
+    assert "2-3倍" in reason
+
+
+def test_d2_pullback_rejects_volume_more_than_three_times_d1():
+    d1 = bar(1, 10, 11, 10, 10.98, 9.9, volume=100, limit_up=11)
+    d2 = bar(2, 10.8, 11.3, 10.5, 10.9, 10.98, volume=320, limit_up=12.08)
+    ok, reason = is_d2_pullback(d1, d2, estimate_d1_support(d1))
     assert not ok
-    assert "超过2倍" in reason
+    assert "超过3倍" in reason
+
+
+def test_d2_pullback_rejects_excessive_volume_shrink():
+    d1 = bar(1, 10, 11, 10, 10.98, 9.9, volume=100, limit_up=11)
+    d2 = bar(2, 10.8, 11.3, 10.5, 10.9, 10.98, volume=50, limit_up=12.08)
+    ok, reason = is_d2_pullback(d1, d2, estimate_d1_support(d1))
+    assert not ok
+    assert "缩量过弱" in reason
+
+
+def test_d2_pullback_rejects_overlong_upper_shadow():
+    d1 = bar(1, 10, 11, 10, 10.98, 9.9, volume=100, limit_up=11)
+    d2 = bar(2, 10.8, 12.0, 10.5, 10.9, 10.98, volume=150, limit_up=12.08)
+    ok, reason = is_d2_pullback(d1, d2, estimate_d1_support(d1))
+    assert not ok
+    assert "上引线太长" in reason
 
 
 def test_d2_pullback_accepts_valid_washout_and_builds_d3_signal():
@@ -69,6 +94,12 @@ def test_d2_pullback_accepts_valid_washout_and_builds_d3_signal():
     assert signal.signal_type == "D3_WATCH_UNDERWATER"
     assert signal.trigger_price == d2.close
     assert signal.invalid_price == support
+    assert "量能未超过2倍" not in signal.reason
+
+
+def test_d2_balanced_cross_detects_small_body_relative_to_range():
+    d2 = bar(2, 10.8, 11.3, 10.5, 10.9, 10.98, volume=150, limit_up=12.08)
+    assert is_d2_balanced_cross(d2)
 
 
 @pytest.mark.parametrize("code", ["600000", "601398", "603912", "605006", "000001", "001696", "002415", "003000"])
@@ -117,9 +148,7 @@ def test_evaluate_d1_board_rejects_with_readable_reason(row, reason_part):
     assert reason_part in result.reject_reason
 
 
-def test_evaluate_d1_board_passes_and_returns_quality_fields_for_valid_d1_row():
+def test_evaluate_d1_board_passes_for_valid_d1_row():
     result = evaluate_d1_board(d1_row())
     assert result.passed
     assert result.reject_reason == ""
-    assert result.d1_quality_score > 0
-    assert "首次封板" in result.d1_quality_notes or "D1" in result.d1_quality_notes

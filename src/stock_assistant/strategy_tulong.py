@@ -13,8 +13,6 @@ EXCLUDED_NAME_PARTS = ("ST", "*ST", "退")
 class D1Evaluation:
     passed: bool
     reject_reason: str = ""
-    d1_quality_score: float = 0.0
-    d1_quality_notes: str = ""
 
 
 def safe_float(value, default: float = 0.0) -> float:
@@ -54,63 +52,6 @@ def is_first_board_from_zt_row(row) -> tuple[bool, str]:
     return False, f"非首板({stat},连板{limit_boards:g})"
 
 
-def evaluate_d1_quality(row) -> tuple[float, str]:
-    first_seal_i = hhmm_to_int(row.get("首次封板时间"))
-    breaks = safe_float(row.get("炸板次数"))
-    fund = safe_float(row.get("封板资金"))
-    amount = safe_float(row.get("成交额"))
-    turnover = safe_float(row.get("换手率"))
-
-    score = 50.0
-    notes: list[str] = []
-
-    if first_seal_i <= 93000:
-        score += 8
-        notes.append("D1早盘封板")
-    elif first_seal_i <= 100000:
-        score += 5
-        notes.append("D1较早封板")
-    elif first_seal_i >= 140000:
-        score -= 5
-        notes.append("D1尾盘封板降权")
-
-    if breaks == 0:
-        score += 5
-        notes.append("D1未炸板")
-    elif breaks <= 2:
-        score += 1
-        notes.append(f"D1炸板{int(breaks)}次")
-    else:
-        score -= 6
-        notes.append(f"D1炸板{int(breaks)}次偏多")
-
-    if fund >= 80_000_000:
-        score += 5
-        notes.append("封板资金较足")
-    elif fund < 10_000_000:
-        score -= 4
-        notes.append("封板资金偏弱")
-
-    if 200_000_000 <= amount <= 3_000_000_000:
-        score += 3
-        notes.append("D1成交额可跟踪")
-    elif amount and amount < 100_000_000:
-        score -= 4
-        notes.append("D1成交额偏小")
-    elif amount > 5_000_000_000:
-        score -= 3
-        notes.append("D1成交额过大偏拥挤")
-
-    if 3 <= turnover <= 20:
-        score += 2
-        notes.append("D1换手适中")
-    elif turnover > 35:
-        score -= 4
-        notes.append("D1换手过高")
-
-    return score, "；".join(notes)
-
-
 def evaluate_d1_board(row) -> D1Evaluation:
     code = str(row.get("代码", "")).zfill(6)
     name = str(row.get("名称", ""))
@@ -125,10 +66,9 @@ def evaluate_d1_board(row) -> D1Evaluation:
     if not first_board:
         reasons.append(first_board_reason)
 
-    score, notes = evaluate_d1_quality(row)
     if reasons:
-        return D1Evaluation(False, "；".join(reasons), score, notes)
-    return D1Evaluation(True, "", score, notes)
+        return D1Evaluation(False, "；".join(reasons))
+    return D1Evaluation(True)
 
 
 def estimate_d1_support(d1: DailyBar, recent_platform_high: float | None = None) -> float:
@@ -152,17 +92,35 @@ def is_d2_pullback(d1: DailyBar, d2: DailyBar, d1_support: float) -> tuple[bool,
     high_above_open = (d2.high / d2.open) - 1 if d2.open else 0
     close_below_high = 1 - (d2.close / d2.high) if d2.high else 0
 
-    if volume_ratio > 2:
-        return False, f"D2成交量/D1={volume_ratio:.2f}，超过2倍"
+    if volume_ratio > 3:
+        return False, f"D2成交量/D1={volume_ratio:.2f}，超过3倍"
+    if volume_ratio < 0.55:
+        return False, f"D2成交量/D1={volume_ratio:.2f}，缩量过弱"
     if open_gap > 0.04 and d2.close < d2.open:
         return False, "D2高开低走，疑似出货"
     if high_above_open < 0.02:
         return False, "D2盘中冲高不足"
     if close_below_high < 0.02:
         return False, "D2冲高回落特征不足"
+    if close_below_high > 0.08:
+        return False, "D2上引线太长，收盘离高点太远"
     if d2.close < d1_support:
         return False, "D2收盘跌破D1支撑位"
-    return True, f"D2冲高回落，量比{volume_ratio:.2f}，未破支撑"
+
+    notes = [f"D2冲高回落，量比{volume_ratio:.2f}"]
+    if volume_ratio > 2:
+        notes.append("2-3倍但其他条件符合")
+    if is_d2_balanced_cross(d2):
+        notes.append("收盘近十字")
+    notes.append("未破支撑")
+    return True, "，".join(notes)
+
+
+def is_d2_balanced_cross(d2: DailyBar) -> bool:
+    day_range = d2.high - d2.low
+    if day_range <= 0:
+        return False
+    return abs(d2.close - d2.open) / day_range <= 0.25
 
 
 def build_d3_watch_signal(d1: DailyBar, d2: DailyBar, d1_support: float) -> StrategySignal:
@@ -171,7 +129,7 @@ def build_d3_watch_signal(d1: DailyBar, d2: DailyBar, d1_support: float) -> Stra
         name=d2.name,
         strategy="tulong",
         signal_type="D3_WATCH_UNDERWATER",
-        reason="D1首板后，D2冲高回落且量能未超过2倍，次日观察水下低吸机会",
+        reason="D1首板后，D2通过量能与形态过滤，次日观察水下低吸机会",
         trigger_price=d2.close,
         invalid_price=d1_support,
         risk_note="若D3跌破D1支撑位，策略失效；D4/D5必须按规则退出",

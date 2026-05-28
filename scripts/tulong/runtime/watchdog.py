@@ -278,7 +278,7 @@ def status_label(event: str) -> str:
         'underwater_cross': '水下观察',
         'underwater': '水下观察',
         'recover_trigger': '回收观察价',
-        'strong_up': '强势雷达',
+        'strong_up': '强势不追',
         'intraday_fade': '冲高回落',
         'near_invalid': '接近止损',
         'invalid': '跌破止损',
@@ -299,7 +299,7 @@ def build_action(event: str, trigger: float, invalid: float) -> str:
     if event == 'recover_trigger':
         return f'看能否站稳{trigger:.2f}；回落不破再观察，跌破{invalid:.2f}放弃'
     if event == 'strong_up':
-        return '进入强势雷达；不追高，等回踩买点区或尾盘确认'
+        return '强势不追；等回踩买点区或尾盘确认'
     if event in {'near_invalid', 'invalid', 'sharp_down'}:
         return f'先放弃买点；跌破{invalid:.2f}移出候选'
     if event == 'intraday_fade':
