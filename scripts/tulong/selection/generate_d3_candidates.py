@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import argparse
 import csv
-import math
 import sys
 from dataclasses import dataclass
 from datetime import date, datetime
@@ -15,10 +14,13 @@ PROJECT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(PROJECT / "src"))
 
 from stock_assistant.akshare_provider import AkshareSinaDailyProvider  # noqa: E402
-from stock_assistant.strategy_tulong import estimate_d1_support, is_d2_pullback  # noqa: E402
-
-EXCLUDE_PREFIXES = ("300", "301", "688", "689", "8", "4")
-EXCLUDE_NAME_PARTS = ("ST", "*ST", "退")
+from stock_assistant.strategy_tulong import (  # noqa: E402
+    estimate_d1_support,
+    evaluate_d1_board,
+    hhmm_to_int,
+    is_d2_pullback,
+    safe_float,
+)
 
 
 @dataclass
@@ -89,7 +91,7 @@ def parse_args(argv: list[str] | None = None) -> SelectionArgs:
     parser.add_argument("--d2-date", required=True, type=parse_yyyymmdd, help="D2 确认日期，YYYYMMDD")
     parser.add_argument("--d3-date", type=parse_yyyymmdd, help="D3 观察日期，YYYYMMDD；未传 --d3-label 时用它推导 MMDDD3")
     parser.add_argument("--d3-label", help="D3 标签，例如 0529D3；未传时由 --d3-date 推导")
-    parser.add_argument("--timestamp", default=datetime.now().strftime("%H%M%S"), help="输出文件时间戳，默认当前 HHMMSS")
+    parser.add_argument("--timestamp", default=datetime.now().strftime("%Y%m%d_%H%M%S"), help="输出文件时间戳，默认当前 YYYYMMDD_HHMMSS")
     parser.add_argument("--max-report", type=int, default=30, help="Markdown 报告最多展示多少只候选")
     parser.add_argument("--max-candidates", type=int, default=12, help="CSV 候选池最多输出多少只")
     parser.add_argument("--project", type=Path, default=PROJECT, help="项目根目录")
@@ -125,25 +127,6 @@ def build_output_paths(project: Path, d3_label: str, timestamp: str, include_d1:
     return paths
 
 
-def safe_float(x, default=0.0):
-    try:
-        if x is None or (isinstance(x, float) and math.isnan(x)):
-            return default
-        return float(x)
-    except Exception:
-        return default
-
-
-def hhmm_to_int(x) -> int:
-    s = str(x).strip()
-    if not s or s == "nan":
-        return 240000
-    try:
-        return int(s)
-    except Exception:
-        return 240000
-
-
 def fmt_yi(x: float) -> str:
     return f"{x / 100000000:.2f}亿"
 
@@ -151,20 +134,6 @@ def fmt_yi(x: float) -> str:
 def entry_zone(trigger: float, invalid: float) -> tuple[float, float]:
     return max(invalid * 1.015, trigger * 0.985), trigger * 1.003
 
-
-def is_d1_main_board_first_limit(row) -> tuple[bool, str]:
-    code = str(row["代码"]).zfill(6)
-    name = str(row["名称"])
-    reasons = []
-    if code.startswith(EXCLUDE_PREFIXES):
-        reasons.append("20cm/北交所/非主板前缀")
-    if any(p in name for p in EXCLUDE_NAME_PARTS):
-        reasons.append("ST/退市风险")
-    stat = str(row.get("涨停统计", ""))
-    lb = safe_float(row.get("连板数"))
-    if not (stat.startswith("1/") or lb == 1):
-        reasons.append(f"非首板({stat},连板{lb:g})")
-    return not reasons, "；".join(reasons)
 
 
 def score_candidate(row, d1, d2, support) -> tuple[float, str, str]:
@@ -322,10 +291,10 @@ def generate(args: SelectionArgs) -> OutputPaths:
         code = str(row["代码"]).zfill(6)
         name = str(row["名称"])
         industry = str(row.get("所属行业", ""))
-        ok_d1, d1_reason = is_d1_main_board_first_limit(row)
-        if not ok_d1:
-            d1_excluded.append(d1_record(row, d1_reason))
-            rejects.append((code, name, d1_reason))
+        d1_eval = evaluate_d1_board(row)
+        if not d1_eval.passed:
+            d1_excluded.append(d1_record(row, d1_eval.reject_reason))
+            rejects.append((code, name, d1_eval.reject_reason))
             continue
         d1_kept.append(d1_record(row))
         checked += 1

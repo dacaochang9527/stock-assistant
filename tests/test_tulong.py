@@ -1,7 +1,18 @@
 from datetime import date, timedelta
 
+import pytest
+
 from stock_assistant.models import DailyBar
-from stock_assistant.strategy_tulong import build_d3_watch_signal, estimate_d1_support, is_d1_first_board, is_d2_pullback
+from stock_assistant.strategy_tulong import (
+    build_d3_watch_signal,
+    estimate_d1_support,
+    evaluate_d1_board,
+    is_d1_first_board,
+    is_d2_pullback,
+    is_excluded_name,
+    is_first_board_from_zt_row,
+    is_main_board_10cm,
+)
 
 
 def bar(offset, open_, high, low, close, prev_close, volume=100, limit_up=11):
@@ -12,6 +23,26 @@ def bar(offset, open_, high, low, close, prev_close, volume=100, limit_up=11):
         open=open_, high=high, low=low, close=close, prev_close=prev_close,
         volume=volume, amount=volume * close, limit_up_price=limit_up,
     )
+
+
+def d1_row(**overrides):
+    row = {
+        "代码": "603912",
+        "名称": "佳力图",
+        "所属行业": "通用设备",
+        "涨跌幅": 10.02,
+        "最新价": 10.98,
+        "成交额": 320_000_000,
+        "换手率": 8.5,
+        "封板资金": 90_000_000,
+        "首次封板时间": "093512",
+        "最后封板时间": "095201",
+        "炸板次数": 1,
+        "涨停统计": "1/1",
+        "连板数": 1,
+    }
+    row.update(overrides)
+    return row
 
 
 def test_d1_first_board_requires_today_limit_and_yesterday_not_limit():
@@ -38,3 +69,57 @@ def test_d2_pullback_accepts_valid_washout_and_builds_d3_signal():
     assert signal.signal_type == "D3_WATCH_UNDERWATER"
     assert signal.trigger_price == d2.close
     assert signal.invalid_price == support
+
+
+@pytest.mark.parametrize("code", ["600000", "601398", "603912", "605006", "000001", "001696", "002415", "003000"])
+def test_d1_main_board_10cm_accepts_shenzhen_and_shanghai_main_board(code):
+    assert is_main_board_10cm(code)
+
+
+@pytest.mark.parametrize("code", ["300750", "301001", "688001", "689009", "833000", "430001", "920001"])
+def test_d1_main_board_10cm_rejects_20cm_bse_and_non_main_board_prefixes(code):
+    assert not is_main_board_10cm(code)
+
+
+@pytest.mark.parametrize("name", ["ST佳力", "*ST天成", "退市海创", "佳力退"])
+def test_d1_excluded_name_rejects_st_and_delisting_risk(name):
+    assert is_excluded_name(name)
+
+
+def test_d1_excluded_name_accepts_normal_name():
+    assert not is_excluded_name("佳力图")
+
+
+@pytest.mark.parametrize(
+    "row",
+    [
+        d1_row(涨停统计="1/2", 连板数=0),
+        d1_row(涨停统计="", 连板数=1),
+        d1_row(涨停统计=None, 连板数="1"),
+    ],
+)
+def test_first_board_from_zt_row_accepts_stat_starting_with_one_or_limit_boards_one(row):
+    ok, reason = is_first_board_from_zt_row(row)
+    assert ok, reason
+
+
+@pytest.mark.parametrize(
+    "row, reason_part",
+    [
+        (d1_row(代码="300750"), "20cm/北交所/非主板前缀"),
+        (d1_row(名称="*ST佳力"), "ST/退市风险"),
+        (d1_row(涨停统计="2/2", 连板数=2), "非首板"),
+    ],
+)
+def test_evaluate_d1_board_rejects_with_readable_reason(row, reason_part):
+    result = evaluate_d1_board(row)
+    assert not result.passed
+    assert reason_part in result.reject_reason
+
+
+def test_evaluate_d1_board_passes_and_returns_quality_fields_for_valid_d1_row():
+    result = evaluate_d1_board(d1_row())
+    assert result.passed
+    assert result.reject_reason == ""
+    assert result.d1_quality_score > 0
+    assert "首次封板" in result.d1_quality_notes or "D1" in result.d1_quality_notes

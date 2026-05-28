@@ -48,8 +48,11 @@ def previous_trading_day(now: datetime) -> datetime:
 
 def timestamp_score(path: Path) -> tuple[str, float]:
     stem = path.stem
-    tail = stem.rsplit('_', 1)[-1]
-    explicit = tail if len(tail) == 6 and tail.isdigit() else ''
+    parts = stem.rsplit('_', 2)
+    if len(parts) >= 3 and len(parts[-2]) == 8 and parts[-2].isdigit() and len(parts[-1]) == 6 and parts[-1].isdigit():
+        explicit = f'{parts[-2]}_{parts[-1]}'
+    else:
+        explicit = ''
     return explicit, path.stat().st_mtime
 
 
@@ -228,7 +231,7 @@ def main() -> int:
 
     sources = find_sources(now)
     if not sources:
-        msg = f'【A股监控】开盘前切池失败\n未找到今日 {now:%m%d}D3/D4 的 *_watch/position_*_HHMMSS.csv；当前监控池未更新。'
+        msg = f'【A股监控】开盘前切池失败\n未找到今日 {now:%m%d}D3/D4 的 *_watch/position_*_YYYYMMDD_HHMMSS.csv；当前监控池未更新。'
         append_log(f'[{now:%Y-%m-%d %H:%M:%S}] preopen_rotate missing_timestamped_sources date={now:%Y-%m-%d}')
         print(msg)
         return 0

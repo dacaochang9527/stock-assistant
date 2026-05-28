@@ -43,9 +43,11 @@ scripts/tulong         = 流程编排器 / 实际运行脚本
 
 - `selection/generate_d3_candidates.py`
   - 当前唯一保留的通用 D3 候选池生成器。
+  - D1 过滤规则已下沉到 `src/stock_assistant/strategy_tulong.py`：`is_main_board_10cm()`、`is_excluded_name()`、`is_first_board_from_zt_row()`、`evaluate_d1_board()`。
+  - 本脚本只负责数据源读取、调用 D1/D2 规则执行器、写 CSV/Markdown；不再保存 `EXCLUDE_PREFIXES`、`EXCLUDE_NAME_PARTS` 或 D1 首板判定副本。
   - 参数化接收 `--d1-date`、`--d2-date`、`--d3-date` 或 `--d3-label`、`--timestamp`。
-  - 输出 `reports/daily/{D3_LABEL}_candidate_scan_{HHMMSS}.md` 和 `data/watchlists/{D3_LABEL}_watch_scan_{HHMMSS}.csv`。
-  - 加 `--d1-only` 时，同时输出 `{D3_LABEL}_D1_filtered_{HHMMSS}.md/.csv`。
+  - 输出 `reports/daily/{D3_LABEL}_candidate_scan_{YYYYMMDD_HHMMSS}.md` 和 `data/watchlists/{D3_LABEL}_watch_scan_{YYYYMMDD_HHMMSS}.csv`。
+  - 加 `--d1-only` 时，同时输出 `{D3_LABEL}_D1_filtered_{YYYYMMDD_HHMMSS}.md/.csv`。
   - 0529D3 的旧一次性脚本已删除：`list_0529d3_d1_filtered.py`、`select_0529d3_candidates.py`。
   - 示例：
 
@@ -54,7 +56,7 @@ scripts/tulong         = 流程编排器 / 实际运行脚本
   --d1-date 20260527 \
   --d2-date 20260528 \
   --d3-date 20260529 \
-  --timestamp 214437 \
+  --timestamp 20260529_214437 \
   --d1-only
 ```
 
