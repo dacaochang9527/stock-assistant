@@ -13,7 +13,7 @@ PROJECT = Path('/Users/fenomenoronaldo/Documents/ai-project/a-share-stock-assist
 if str(PROJECT) not in sys.path:
     sys.path.insert(0, str(PROJECT))
 
-from scripts.tulong_watchdog import load_watchlist, fetch_quotes, entry_zone, format_money_yi
+from scripts.tulong.runtime.watchdog import load_watchlist, fetch_quotes, entry_zone, format_money_yi
 
 REPORT_DIR = PROJECT / 'reports/reviews'
 ALERT_DIR = PROJECT / 'reports/alerts'

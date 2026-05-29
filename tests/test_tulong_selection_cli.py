@@ -1,6 +1,7 @@
 from datetime import date
 from pathlib import Path
 import importlib.util
+from types import SimpleNamespace
 
 
 import sys
@@ -66,3 +67,13 @@ def test_infer_label_from_d3_date_when_label_omitted():
     ])
 
     assert args.d3_label == "0529D3"
+
+
+def test_auto_narrow_prefers_candidates_without_severe_flags():
+    mod = load_module()
+    clean = SimpleNamespace(code="600000", score=80, flags="")
+    risky = SimpleNamespace(code="600001", score=99, flags="高开低走")
+    selected, narrowed_out = mod.auto_narrow_candidates([risky, clean], 1)
+
+    assert selected == [clean]
+    assert narrowed_out == [risky]

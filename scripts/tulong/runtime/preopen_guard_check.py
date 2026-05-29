@@ -52,9 +52,9 @@ def load_active_rows() -> list[dict[str, str]]:
 def script_load_watchlist_summary() -> dict[str, Any]:
     if str(PROJECT) not in sys.path:
         sys.path.insert(0, str(PROJECT))
-    from scripts import tulong_watchdog
+    from scripts.tulong.runtime import watchdog
 
-    watchlist = tulong_watchdog.load_watchlist()
+    watchlist = watchdog.load_watchlist()
     return {
         'count': len(watchlist),
         'codes': [item['code'] for item in watchlist],

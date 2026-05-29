@@ -75,6 +75,20 @@ class Candidate:
     flags: str
 
 
+AUTO_NARROW_EXCLUDE_FLAGS = (
+    "高开低走",
+    "D2仍大涨",
+    "D2走弱",
+    "安全垫薄",
+    "成交小",
+    "成交拥挤",
+    "换手过高",
+    "量能过大",
+    "缩量过弱",
+    "上引线过长",
+)
+
+
 def parse_yyyymmdd(value: str) -> date:
     try:
         return datetime.strptime(value, "%Y%m%d").date()
@@ -225,6 +239,15 @@ def score_candidate(row, d1, d2, support) -> tuple[float, str, str]:
     return score, "；".join(notes), "；".join(flags)
 
 
+def auto_narrow_candidates(candidates: list[Candidate], limit: int) -> tuple[list[Candidate], list[Candidate]]:
+    """Keep D3 scan outputs current by narrowing every generated candidate set."""
+    ranked = sorted(candidates, key=lambda c: c.score, reverse=True)
+    preferred = [c for c in ranked if not any(flag in c.flags for flag in AUTO_NARROW_EXCLUDE_FLAGS)]
+    fallback = [c for c in ranked if c not in preferred]
+    selected = (preferred + fallback)[:limit]
+    return selected, [c for c in ranked if c not in selected]
+
+
 def d1_record(row, exclude_reason: str | None = None) -> dict:
     code = str(row["代码"]).zfill(6)
     rec = {
@@ -342,18 +365,19 @@ def generate(args: SelectionArgs) -> OutputPaths:
     write_d1_outputs(paths, args.d3_label, args.d1_date, zt, d1_kept, d1_excluded)
 
     raw.sort(key=lambda c: c.score, reverse=True)
-    selected = raw[:args.max_candidates]
-    report_candidates = raw[:args.max_report]
+    selected, narrowed_out = auto_narrow_candidates(raw, args.max_candidates)
+    report_candidates = selected[:args.max_report]
 
     lines = [
-        f"# {args.d3_label} 机械初筛（D1={args.d1_date:%m%d}首板，D2={args.d2_date:%m%d}确认）",
+        f"# {args.d3_label} 自动窄化扫描（D1={args.d1_date:%m%d}首板，D2={args.d2_date:%m%d}确认）",
         "",
         f"- D1首板池日期：{d1_date_str}",
         f"- 主板首板候选检查：{checked} 只",
-        f"- 通过D2硬条件：{len(raw)} 只",
-        "- 说明：这是机械初筛，下一步还要按 D3 夜间人工窄化复核清单筛到核心观察区/低频观察。",
+        f"- 通过D2过滤规则：{len(raw)} 只",
+        f"- 自动窄化后输出：{len(selected)} 只",
+        "- 说明：每次生成或更新 D3 初选时先自动窄化，后续如有人工修正再另行落盘。",
         "",
-        "## 候选排序",
+        "## 自动窄化保留排序",
     ]
     for i, c in enumerate(report_candidates, 1):
         lines.append(f"### {i}. {c.code} {c.name}｜{c.industry}｜评分 {c.score:.1f}")
@@ -368,6 +392,11 @@ def generate(args: SelectionArgs) -> OutputPaths:
     lines.append("## 部分剔除原因样本")
     for code, name, why in rejects[:40]:
         lines.append(f"- {code} {name}：{why}")
+    if narrowed_out:
+        lines.extend(["", "## 自动窄化未输出"])
+        for c in narrowed_out[:40]:
+            why = c.flags or "容量限制"
+            lines.append(f"- {c.code} {c.name}：{why}")
 
     paths.report.write_text("\n".join(lines), encoding="utf-8")
     with paths.csv.open("w", newline="", encoding="utf-8") as f:

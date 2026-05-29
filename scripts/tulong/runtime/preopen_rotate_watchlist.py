@@ -191,10 +191,10 @@ def active_state_matches(now: datetime) -> bool:
 def validate_active_watchlist(now: datetime) -> dict[str, object]:
     if str(PROJECT) not in sys.path:
         sys.path.insert(0, str(PROJECT))
-    from scripts import tulong_watchdog
+    from scripts.tulong.runtime import watchdog
 
     expected_prefix = f'{now:%m%d}'
-    watchlist = tulong_watchdog.load_watchlist()
+    watchlist = watchdog.load_watchlist()
     bad_prefix = [item['code'] for item in watchlist if not is_main_board(item['code'])]
     stale_stage = [item['code'] for item in watchlist if not str(item.get('stage', '')).startswith(expected_prefix)]
     bad_pool_type = [item['code'] for item in watchlist if item.get('pool_type') not in VALID_POOL_TYPES]
