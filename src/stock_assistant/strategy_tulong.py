@@ -132,5 +132,5 @@ def build_d3_watch_signal(d1: DailyBar, d2: DailyBar, d1_support: float) -> Stra
         reason="D1首板后，D2通过量能与形态过滤，次日观察水下低吸机会",
         trigger_price=d2.close,
         invalid_price=d1_support,
-        risk_note="若D3跌破D1支撑位，策略失效；D4/D5必须按规则退出",
+        risk_note="若D3跌破D1支撑位，策略失效；买入后的退出规则待验证后另行制定",
     )
